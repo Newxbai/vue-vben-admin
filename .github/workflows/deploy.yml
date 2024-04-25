@@ -4,63 +4,29 @@ on:
   push:
     branches:
       - main
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 0'
+
+permissions: 
+  # Allows the EndBug/add-and-commit step to commit the package manager changes,
+  # adding the AppMap language library and configuration file appmap.yml.
+  # Once the EndBug/add-and-commit is removed, this permission can be removed, 
+  # unless you need it for other reasons.
+  contents: write
+
+  # Allows the getappmap/archive-action to write a PR comment with the 
+  # AppMap configuration status.
+  pull-requests: write
 
 jobs:
-  # push-to-ftp:
-  #   if: "contains(github.event.head_commit.message, '[deploy]')"
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v2
-
-  #     - name: Sed Config Base
-  #       shell: bash
-  #       run: |
-  #         sed -i  's#VITE_PUBLIC_PATH\s*=.*#VITE_PUBLIC_PATH = /next/#g' ./.env.production
-  #         sed -i  "s#VITE_BUILD_COMPRESS\s*=.*#VITE_BUILD_COMPRESS = 'gzip'#g" ./.env.production
-  #         cat ./.env.production
-
-  #     - name: use Node.js 14
-  #       uses: actions/setup-node@v2.1.2
-  #       with:
-  #         node-version: '14.x'
-
-  #     - name: Get yarn cache
-  #       id: yarn-cache
-  #       run: echo "::set-output name=dir::$(yarn cache dir)"
-
-  #     - name: Cache dependencies
-  #       uses: actions/cache@v2
-  #       with:
-  #         path: ${{ steps.yarn-cache.outputs.dir }}
-  #         key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-yarn-
-
-  #     - name: Build
-  #       run: |
-  #         yarn install
-  #         yarn run build
-
-  #     - name: Deploy
-  #       uses: SamKirkland/FTP-Deploy-Action@2.0.0
-  #       env:
-  #         FTP_SERVER: ${{ secrets.FTP_SERVER }}
-  #         FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-  #         FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-  #         METHOD: sftp
-  #         PORT: ${{ secrets.FTP_PORT }}
-  #         LOCAL_DIR: dist
-  #         REMOTE_DIR: /srv/www/vben-admin
-  #         ARGS: --delete --verbose --parallel=80
-
   push-to-gh-pages:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-
-      #      - uses: NullVoxPopuli/action-setup-pnpm@v2
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Sed Config Base
         shell: bash
@@ -80,17 +46,25 @@ jobs:
         with:
           node-version: '20.x'
 
-      #      - name: Get yarn cache directory path
-      #        id: yarn-cache-dir-path
-      #        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-      #
-      #      - name: Cache dependencies
-      #        uses: actions/cache@v3
-      #        with:
-      #          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-      #          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-      #          restore-keys: |
-      #            ${{ runner.os }}-yarn-
+      # Begin AppMap CI language agent installation
+      - name: Install AppMap tools
+        id: install-appmap
+        uses: getappmap/install-action@v1
+        with:
+          project-type: npm
+      - name: Commit changes
+        uses: EndBug/add-and-commit@v9
+        with:
+          message: "ci: Add AppMap language agent and appmap.yml"
+      # End AppMap CI language agent installation
+
+      # Begin AppMap bootstrap archive step
+      - name: Archive AppMaps
+        id: appmap-bootstrap-archive-appmaps
+        uses: getappmap/archive-action@v1
+        with:
+          revision: ${{ github.event.pull_request.base.sha }}
+      # End AppMap bootstrap archive step
 
       - name: Set SSH Environment
         env:
