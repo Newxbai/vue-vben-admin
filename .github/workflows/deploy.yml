@@ -54,6 +54,13 @@ jobs:
           touch dist/.nojekyll
           cp dist/index.html dist/404.html
 
+      - name: Save AppMaps
+        uses: actions/cache/save@v3
+        if: always()
+        with:
+          path: ./tmp/appmap
+          key: appmaps-${{ github.sha }}-${{ github.run_attempt }}
+
       - name: Delete gh-pages branch
         run: |
           git push origin --delete gh-pages
@@ -65,3 +72,13 @@ jobs:
           PUBLISH_BRANCH: gh-pages
           PUBLISH_DIR: ./dist
           CNAME: vben.vvbin.cn
+
+  appmap-analysis:
+    if: always()
+    needs: [ push-to-gh-pages ]
+    uses: getappmap/analyze-action/.github/workflows/appmap-analysis.yml@v1
+    permissions:
+      actions: read
+      contents: read
+      checks: write
+      pull-requests: write
